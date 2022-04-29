@@ -1,0 +1,38 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - https://getcloudify.org/spec/cloudify/5.0.5/types.yaml
+  - plugin:cloudify-kubernetes-plugin?version= >=2.7.0
+
+inputs:
+
+  kubernetes_master_endpoint:
+    type: string
+    display_label: Kubernetes API Endpoint
+
+  validate_status:
+    type: boolean
+    default: true
+    display_label: Validate Resource Status
+
+node_templates:
+
+  nginx:
+    type: cloudify.kubernetes.resources.FileDefinedResource
+    properties:
+      client_config:
+        authentication:
+          gcp_service_account: { get_secret: gcp_credentials }
+        configuration:
+          api_options:
+            host: { get_input: kubernetes_master_endpoint }
+            verify_ssl: false
+            debug: false
+      validate_resource_status: { get_input: validate_status }
+      file:
+        resource_path: resources/nginx.yaml
+
+outputs:
+  nginx_endpoint:
+    description: Load balancer endpoint for NGINX
+    value: { concat: [ "http://", { get_attribute: [ nginx, kubernetes, resources/nginx.yaml#1, status, load_balancer, ingress, 0, ip ] }, ":8080" ] }
